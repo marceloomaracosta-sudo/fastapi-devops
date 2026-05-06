@@ -1,0 +1,30 @@
+name: Deploy a AWS
+
+on:
+  push:
+    branches:
+      - main  # se ejecuta cada vez que pusheás a main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v3
+
+      - name: Conectarse a EC2 y deployar
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}        # IP de tu instancia
+          username: ubuntu                      # usuario por defecto en Ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}       # contenido de tu archivo .pem
+          script: |
+            cd /home/ubuntu
+            if [ ! -d "fastapi-devops" ]; then
+              git clone https://github.com/marceloomaracosta-sudo/fastapi-devops.git fastapi-devops
+            fi
+            cd fastapi-devops
+            git pull origin main
+            docker-compose down
+            docker-compose up --build -d
