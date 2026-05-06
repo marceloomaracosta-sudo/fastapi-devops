@@ -1,0 +1,23 @@
+services:
+  api:
+    build: ./app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://usuario:password@db:5432/tareas_db
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: usuario
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tareas_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # guarda los datos fuera del contenedor
+
+volumes:
+  postgres_data:  # define el volumen nombrado que Docker va a mantener entre reinicios
