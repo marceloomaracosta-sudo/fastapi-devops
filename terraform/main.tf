@@ -1,13 +1,14 @@
-# proveedor de AWS con la región definida en variables
 provider "aws" {
   region = var.region
 }
 
-# security group que permite tráfico HTTP en puerto 8000 y SSH en puerto 22
+# security group con reglas de entrada para puerto 8000 y 22
 resource "aws_security_group" "api_sg" {
-  name = "api-sg"
+  name        = "api-sg"
+  description = "Permite trafico HTTP y SSH"
 
   ingress {
+    description = "Puerto API"
     from_port   = 8000
     to_port     = 8000
     protocol    = "tcp"
@@ -15,6 +16,7 @@ resource "aws_security_group" "api_sg" {
   }
 
   ingress {
+    description = "Puerto SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -27,16 +29,19 @@ resource "aws_security_group" "api_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "api-sg"
+  }
 }
 
-# instancia EC2 donde va a correr la API
+# instancia EC2 con el security group explicitamente asignado
 resource "aws_instance" "api_server" {
   ami                    = var.ami
-  instance_type          = "t3.micro"  # capa gratuita de AWS
-  vpc_security_group_ids = [aws_security_group.api_sg.id]
+  instance_type          = "t3.micro"
   key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.api_sg.id]
 
-  # instala Docker y Docker Compose al iniciar la instancia
   user_data = <<-EOF
     #!/bin/bash
     apt-get update -y
