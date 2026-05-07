@@ -8,6 +8,22 @@ resource "aws_security_group" "api_sg" {
   description = "Permite trafico HTTP y SSH"
 
   ingress {
+  description = "Prometheus"
+  from_port   = 9090
+  to_port     = 9090
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+ingress {
+  description = "Grafana"
+  from_port   = 3000
+  to_port     = 3000
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+  ingress {
     description = "Puerto API"
     from_port   = 8000
     to_port     = 8000

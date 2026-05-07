@@ -13,67 +13,80 @@ def esperar_db():
             print("Esperando base de datos...")
             time.sleep(2)
 
-from fastapi import FastAPI
-from sqlalchemy import create_engine, Column, Integer, String  # tipos de columnas para la tabla
-from sqlalchemy.ext.declarative import declarative_base  # base para definir modelos de tablas
-from sqlalchemy.orm import sessionmaker, Session  # manejo de sesiones con la base de datos
-from fastapi import Depends  # para inyectar dependencias en los endpoints
-import os  # para leer variables de entorno
+from fastapi import FastAPI, Depends
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+import os
+import time
+import logging
 
-# lee la URL de conexión a la base de datos desde una variable de entorno
+# configura el sistema de logs para mostrar fecha, nivel y mensaje
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# espera hasta que la base de datos esté lista antes de arrancar
+def esperar_db():
+    import psycopg2
+    while True:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            conn.close()
+            logger.info("Base de datos lista")
+            break
+        except Exception:
+            logger.warning("Esperando base de datos...")
+            time.sleep(2)
 
 esperar_db()
 
-# crea el motor de conexión a PostgreSQL usando la URL
 engine = create_engine(DATABASE_URL)
-
-# crea una clase de sesión vinculada al motor, cada sesión es una "conversación" con la DB
 SessionLocal = sessionmaker(bind=engine)
-
-# clase base de la que van a heredar todos los modelos de tablas
 Base = declarative_base()
 
-# define el modelo de la tabla "tareas" en la base de datos
 class Tarea(Base):
-    __tablename__ = "tareas"             # nombre de la tabla en PostgreSQL
-    id = Column(Integer, primary_key=True, index=True)  # columna id, clave primaria autoincrementable
-    titulo = Column(String)              # columna titulo, texto libre
+    __tablename__ = "tareas"
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String)
 
-# crea la tabla en la base de datos si no existe todavía
 Base.metadata.create_all(bind=engine)
 
-# instancia principal de la aplicación FastAPI
 app = FastAPI()
 
-# función que abre una sesión con la DB y la cierra cuando termina el request
 def get_db():
-    db = SessionLocal()  # abre la sesión
+    db = SessionLocal()
     try:
-        yield db          # la entrega al endpoint que la pidió
+        yield db
     finally:
-        db.close()        # la cierra siempre, aunque haya un error
+        db.close()
 
-# endpoint GET: devuelve todas las tareas guardadas en la base de datos
 @app.get("/tareas")
-def listar_tareas(db: Session = Depends(get_db)):  # inyecta la sesión automáticamente
-    return db.query(Tarea).all()  # consulta todas las filas de la tabla tareas
+def listar_tareas(db: Session = Depends(get_db)):
+    logger.info("GET /tareas - listando todas las tareas")
+    return db.query(Tarea).all()
 
-# endpoint POST: recibe un JSON con "titulo" y crea una tarea nueva en la DB
 @app.post("/tareas")
 def crear_tarea(tarea: dict, db: Session = Depends(get_db)):
-    nueva = Tarea(titulo=tarea["titulo"])  # crea el objeto tarea con el titulo recibido
-    db.add(nueva)      # lo agrega a la sesión (todavía no se guarda)
-    db.commit()        # guarda los cambios en la base de datos
-    db.refresh(nueva)  # actualiza el objeto con los datos que asignó la DB (como el id)
-    return nueva       # devuelve la tarea creada con su id
+    logger.info(f"POST /tareas - creando tarea: {tarea}")
+    nueva = Tarea(titulo=tarea["titulo"])
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
 
-# endpoint DELETE: recibe un id y elimina esa tarea de la base de datos
 @app.delete("/tareas/{id}")
 def borrar_tarea(id: int, db: Session = Depends(get_db)):
-    tarea = db.query(Tarea).filter(Tarea.id == id).first()  # busca la tarea por id
+    logger.info(f"DELETE /tareas/{id} - intentando borrar tarea")
+    tarea = db.query(Tarea).filter(Tarea.id == id).first()
     if not tarea:
-        return {"error": "No existe"}  # si no la encuentra, devuelve error
-    db.delete(tarea)   # marca la tarea para eliminar
-    db.commit()        # confirma la eliminación en la base de datos
-    return {"mensaje": "Eliminada"}  # confirma que se eliminó
+        logger.warning(f"DELETE /tareas/{id} - tarea no encontrada")
+        return {"error": "No existe"}
+    db.delete(tarea)
+    db.commit()
+    logger.info(f"DELETE /tareas/{id} - tarea eliminada correctamente")
+    return {"mensaje": "Eliminada"}
