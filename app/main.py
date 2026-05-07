@@ -1,3 +1,18 @@
+import time
+
+# espera hasta que la base de datos esté lista antes de arrancar
+def esperar_db():
+    import psycopg2
+    while True:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            conn.close()
+            print("Base de datos lista")
+            break
+        except Exception:
+            print("Esperando base de datos...")
+            time.sleep(2)
+
 from fastapi import FastAPI
 from sqlalchemy import create_engine, Column, Integer, String  # tipos de columnas para la tabla
 from sqlalchemy.ext.declarative import declarative_base  # base para definir modelos de tablas
@@ -7,6 +22,8 @@ import os  # para leer variables de entorno
 
 # lee la URL de conexión a la base de datos desde una variable de entorno
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+esperar_db()
 
 # crea el motor de conexión a PostgreSQL usando la URL
 engine = create_engine(DATABASE_URL)
